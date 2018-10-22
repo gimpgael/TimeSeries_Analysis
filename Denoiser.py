@@ -8,6 +8,7 @@ implementing methods, in order to have a generic tool.
 import numpy as np
 import pandas as pd
 import pywt
+import pykalman
 
 class Denoiser():
     """Algorithm, quite generic, but designed to use several methodologies for
@@ -23,15 +24,19 @@ class Denoiser():
     -----------------     
     - fit_wavelet: Haar wavelet approach
     - fit_ma: Simple moving average approach
+    - fit_kalman: Kalman filters
     """
     
-    def __init__(self, period):
+    def __init__(self, period = 5):
         """Initialize the algorithm"""
         
         self.period = period
         
     def fit_wavelet(self, x):
         """Denoise the x time series, using the wavelet Haar approach"""
+
+        # Reshape the input
+        x = x.reshape((-1,))
 
         # Initialize result
         res = x.reshape(-1,1).copy()
@@ -69,7 +74,21 @@ class Denoiser():
         # Return all but initial signal
         return x[:,1:]
     
-
+    def fit_kalman(self, x):
+        """Denoise the x time series, using Kalman Filters"""
         
-    
-    
+        # Initialize Kalman filters
+        kf = pykalman.KalmanFilter(transition_matrices = [1],
+                                  observation_matrices = [1],
+                                  initial_state_mean = x[0],
+                                  initial_state_covariance = 1,
+                                  observation_covariance = 1,
+                                  transition_covariance = .01)
+            
+        # Extract the smooth part of the signal, then residuals
+        rec, _ = kf.filter(x)
+        res = x.reshape(-1,1) - rec
+        
+        # Return reconstructed signal and residual
+        return np.append(rec, res, axis = 1)
+        
